@@ -7,6 +7,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,29 +23,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material3.BottomAppBar
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.focusModifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
@@ -56,27 +39,24 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.draw.clip
 import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.NavHost
 import coil.compose.rememberAsyncImagePainter
-import com.example.recipeapp.DishViewModel.DishState
 import kotlin.random.Random
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryScreen(
-    modifier: Modifier = Modifier,
-    navController: NavController
+    navController: NavController,
+    viewState: CategoryViewModel.ReciepeState,
+    navigateToDetail: (Category) -> Unit
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(text = "Categories") }
-            )
+            TopAppBar(title = { Text(text = "Categories") })
         },
         bottomBar = {
             BottomAppBar {
@@ -89,9 +69,6 @@ fun CategoryScreen(
             }
         },
         content = { paddingValues ->
-            val categoryViewModel: CategoryViewModel = viewModel()
-            val viewState by categoryViewModel.categoriestate
-
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -99,24 +76,9 @@ fun CategoryScreen(
                 contentAlignment = Alignment.Center
             ) {
                 when {
-                    viewState.loading -> {
-                        CircularProgressIndicator()
-                    }
-
-                    viewState.error != null -> {
-                        Text(
-                            text = "Error: ${viewState.error}",
-                            color = Color.Red
-                        )
-                    }
-
-                    viewState.list.isEmpty() -> {
-                        Text(
-                            text = "No categories available.",
-                            color = Color.Gray
-                        )
-                    }
-
+                    viewState.loading -> CircularProgressIndicator()
+                    viewState.error != null -> Text(text = "Error: ${viewState.error}", color = Color.Red)
+                    viewState.list.isEmpty() -> Text(text = "No categories available.", color = Color.Gray)
                     else -> {
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(2),
@@ -125,7 +87,7 @@ fun CategoryScreen(
                             items(viewState.list) { category ->
                                 CategoryItem(
                                     category = category,
-                                    navController = navController
+                                    navigateToDetail = navigateToDetail
                                 )
                             }
                         }
@@ -139,18 +101,14 @@ fun CategoryScreen(
 @Composable
 fun CategoryItem(
     category: Category,
-    navController: NavController,
-    dishViewModel: DishViewModel = viewModel()
+    navigateToDetail: (Category) -> Unit
 ) {
     Box(
         modifier = Modifier
             .padding(8.dp)
             .background(color = Color.Gray, shape = RoundedCornerShape(8.dp))
             .fillMaxSize()
-            .clickable {
-                dishViewModel.fetchDishes(category.strCategory)
-                navController.navigate("DishScreen")
-            }
+            .clickable { navigateToDetail(category) }
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -163,7 +121,6 @@ fun CategoryItem(
                     .fillMaxWidth()
                     .aspectRatio(1f)
             )
-
             Text(
                 text = category.strCategory,
                 color = Color.Black,
@@ -174,147 +131,49 @@ fun CategoryItem(
     }
 }
 
-
-
-
-
 @OptIn(ExperimentalMaterial3Api::class)
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun DishScreen(
-    navController: NavController,
-    modifier: Modifier = Modifier,
-) {
-    val viewModel: DishViewModel = viewModel()
-    val dishState by viewModel.dishestate.collectAsState()
-    val errorMessage by viewModel.errorMessage.collectAsState()
-
-    Scaffold(
+fun DishItem(category: Category, navController: NavController) {
+    val context = LocalContext.current
+    Scaffold (
         topBar = {
             TopAppBar(
+                title = { Text(text = category.strCategory) },
                 navigationIcon = {
-                    IconButton(
-                        onClick = { navController.popBackStack() }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
-                        )
+                    IconButton(onClick = { navController.navigate("Menu") }) {
+                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
                     }
-                },
-                title = { Text(text = "Dish Details") }
+                }
             )
         },
-        bottomBar = {
-            BottomAppBar {
-                var selectedTab by remember { mutableStateOf("Menu") }
-                NavBar(
-                    selectedTab = selectedTab,
-                    onTabSelected = { selectedTab = it },
-                    navController = navController
-                )
-            }
-        },
-        content = { paddingValues ->
-            Box(
+        content = {
+            Column(
                 modifier = Modifier
+                    .padding(it)
                     .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center
+                    .verticalScroll(rememberScrollState())
+                    .padding(10.dp)
+
             ) {
-                when {
-                    dishState.loading -> {
-                        CircularProgressIndicator()
-                    }
-                    dishState.list.isNotEmpty() -> {
-                        val dish = dishState.list.firstOrNull()
-                        if (dish != null) {
-                            DishItem(
-                                dish = dish
-                            )
-                        } else {
-                            Text(
-                                text = "Unexpected error occurred while displaying the dish.",
-                                color = MaterialTheme.colorScheme.error,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-                    errorMessage.isNotEmpty() -> {
-                        Text(
-                            text = errorMessage,
-                            color = MaterialTheme.colorScheme.error,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    else -> {
-                        Text(
-                            text = "No recipe found. Please search!",
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                Column (
+                    modifier = Modifier.fillMaxSize().border(2.dp, Color.DarkGray, shape = RoundedCornerShape(10.dp)).padding(15.dp)
+                ){
+                    Image(
+                        painter = rememberAsyncImagePainter(model = category.strCategoryThumb),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxWidth().aspectRatio(1f).size(250.dp)
+                            .align(Alignment.CenterHorizontally)
+                    )
+                    Spacer(modifier = Modifier.height(19.dp))
+
+                    Column (
+                        modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(color = Color.DarkGray).padding(12.dp)
+                    ){
+                        Text(category.strCategoryDescription, textAlign = TextAlign.Justify)
                     }
                 }
             }
         }
     )
-}
-
-
-
-
-
-
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun DishItem(
-    dish: Dish
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-    ) {
-        Image(
-            painter = rememberAsyncImagePainter(model = dish.strMealThumb),
-            contentDescription = "Dish Image",
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(dish.strMeal, modifier = Modifier.size(100.dp))
-        Spacer(modifier= Modifier.height(12.dp))
-
-        val context = LocalContext.current
-        Text(
-            text = buildAnnotatedString {
-                append("Youtube")
-                addStyle(style = SpanStyle(color = Color.Red, fontWeight = FontWeight.Bold), start = 0, end = 4)
-            },
-            modifier = Modifier.clickable {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(dish.strYoutube))
-                context.startActivity(intent)
-            },
-            fontSize = 18.sp
-        )
-        Spacer(modifier= Modifier.height(12.dp))
-
-        Row {
-            Column {
-                Text(dish.strCategory)
-            }
-            Column {
-                Text(dish.strArea)
-            }
-        }
-
-        Spacer(modifier= Modifier.height(12.dp))
-
-        Text(dish.strInstructions)
-
-        Spacer(modifier= Modifier.height(12.dp))
-    }
 }

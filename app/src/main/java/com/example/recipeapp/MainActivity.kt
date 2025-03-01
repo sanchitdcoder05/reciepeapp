@@ -7,9 +7,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.navigation.NavController
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -22,8 +21,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             RecipeAppTheme {
-
                 val navController = rememberNavController()
+                val categoryViewModel: CategoryViewModel = viewModel()
+                val viewState = categoryViewModel.categoriestate.value
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize()
@@ -37,20 +37,34 @@ class MainActivity : ComponentActivity() {
                             Home(navController = navController)
                         }
 
-                        composable("ReciepeScreen") {
-                            CategoryScreen(navController = navController)
+                        composable(route = Screen.CategoryScreen.route) {
+                            CategoryScreen(
+                                navController = navController,
+                                viewState = viewState,
+                                navigateToDetail = {
+                                    navController.currentBackStackEntry?.savedStateHandle?.set("cat", it)
+                                    navController.navigate(Screen.DishItem.route)
+                                }
+                            )
                         }
 
-                        composable("SerchScreen") {
-                            SearchScreen(navController = navController)
+                        composable(route = Screen.DishItem.route) {
+                            val category = navController.previousBackStackEntry?.savedStateHandle?.get<Category>("cat")
+                                ?: Category("", "", "", "")
+                            DishItem(category = category, navController = navController)
                         }
 
-                        composable("DishScreen") {
-                            DishScreen(navController = navController)
+                        composable("SearchScreen") {
+                            SearchScreen(navController)
                         }
+
+                        composable("SearchScreen/{mealName}") { backStackEntry ->
+                            val mealName = backStackEntry.arguments?.getString("mealName") ?: ""
+                            SearchScreen(navController, mealName)
+                        }
+
                     }
                 }
-
             }
         }
     }

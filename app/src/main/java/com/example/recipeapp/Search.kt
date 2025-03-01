@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.BottomAppBar
@@ -31,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -48,13 +52,49 @@ import coil.compose.rememberAsyncImagePainter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchScreen(navController: NavController){
+fun SearchScreen(navController: NavController, mealName: String = ""){
+    val viewModel: RecipeViewModel = viewModel()
+    val recipe by viewModel.recipe.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+    var query by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        if (mealName != null){
+            query = mealName
+            viewModel.fetchRecipe(query)
+        }
+    }
     Scaffold (
         topBar = {
             TopAppBar(
-                title = { Text(text = "Search") }
+                title = {
+                    if (query != ""){
+                        Row {
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(query)
+                        }
+                    }
+                    else{
+                        Row {
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text("Search Recipe")
+                        }
+                    }
+                },
+                navigationIcon = {
+                    if (query != "") {
+                        Icon(
+                            imageVector = Icons.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            modifier = Modifier.pointerInput(Unit) {
+                                navController.popBackStack()
+                            }
+                        )
+                    }
+                }
             )
-        },
+        }
+        ,
         bottomBar = {
             BottomAppBar {
                 var selectedTab by remember { mutableStateOf("Search") }
@@ -66,16 +106,13 @@ fun SearchScreen(navController: NavController){
             }
         },
         content = { paddingValues ->
-            val viewModel: RecipeViewModel = viewModel()
-            val recipe by viewModel.recipe.collectAsState()
-            val errorMessage by viewModel.errorMessage.collectAsState()
-            var query by remember { mutableStateOf("") }
+
 
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
+                    .padding(paddingValues)
+                    .verticalScroll(rememberScrollState())
             ){
             Column(
                 modifier = Modifier
@@ -84,7 +121,10 @@ fun SearchScreen(navController: NavController){
             ) {
                 OutlinedTextField(
                     value = query,
-                    onValueChange = { query = it },
+                    onValueChange = {
+                        query = it
+                        viewModel.fetchRecipe(query)
+                    },
                     label = { Text("Search Recipe") },
                     trailingIcon = { Icon(Icons.Filled.ArrowForward, contentDescription = "Search Icon", modifier = Modifier.clickable {
                         viewModel.fetchRecipe(query)
@@ -92,17 +132,11 @@ fun SearchScreen(navController: NavController){
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-//                Button(
-//                    onClick = { viewModel.fetchRecipe(query) },
-//                    modifier = Modifier.fillMaxWidth()
-//                ) {
-//                    Text("Search")
-//                }
 
-                Text("First letter should be capital and The Dish should be Polopu;alr Widely")
+                Text("Disclaimer : Put Popular Dishes Only")
                 Spacer(modifier = Modifier.height(16.dp))
 
-                if (recipe != null) {
+                if (recipe != null && query != "") {
                     RecipeDetails(recipe = recipe!!)
                 } else if (errorMessage.isNotEmpty()) {
                     Text(
@@ -148,12 +182,14 @@ fun RecipeDetails(recipe: Recipe) {
         Text("Category: ${recipe.strCategory}")
         Text("Area: ${recipe.strArea}")
         Spacer(modifier = Modifier.height(8.dp))
-        Text("Instructions:")
-        Spacer(modifier = Modifier.height(4.dp))
-        Text("Watch on Youtube", modifier = Modifier.clickable {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(recipe.strYoutube))
-            context.startActivity(intent)
-        })
+        Row {
+            Text("Instructions : ")
+            Text("Youtube", color = Color.Red, modifier = Modifier.clickable {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(recipe.strYoutube))
+                context.startActivity(intent)
+            }
+            )
+        }
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(recipe.strInstructions)
